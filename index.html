@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" manifest="cache.appcache">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HEXA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+  html, body {
+    min-height:100vh;
+    background:#090c14;
+    color:#c4d1e0;
+    font:15px/1.5 'Inter', system-ui, sans-serif;
+    overflow:hidden;
+  }
+
+  /* Animated gradient background */
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 80%, rgba(0,180,200,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 60% at 80% 20%, rgba(56,100,220,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 80% 80% at 50% 50%, rgba(10,30,60,0.4) 0%, transparent 100%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* Brand bar */
+  #brand {
+    position:relative;
+    z-index:10;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    padding:14px 20px;
+    background:rgba(12,18,30,0.85);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(56,180,220,0.12);
+  }
+
+  #brand .logo-icon {
+    width:34px; height:34px;
+    border-radius:10px;
+    background:linear-gradient(135deg, #0ea5c0 0%, #3864dc 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    font-size:16px;
+    color:#fff;
+    letter-spacing:0.02em;
+    box-shadow:0 0 18px rgba(14,165,192,0.25);
+    flex-shrink:0;
+  }
+
+  #brand b {
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:0.22em;
+    background:linear-gradient(135deg, #5de0f5 0%, #a0c4ff 50%, #5de0f5 100%);
+    background-size:200% 100%;
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+    animation:shimmer 4s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%,100% { background-position:0% 50%; }
+    50% { background-position:100% 50%; }
+  }
+
+  /* Main content */
+  #wrap {
+    position:relative;
+    z-index:10;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:calc(100vh - 63px);
+    padding:32px 24px;
+    text-align:center;
+  }
+
+  #state {
+    font-size:24px;
+    font-weight:700;
+    margin:0 0 10px;
+    letter-spacing:0.01em;
+    transition:color 0.3s ease;
+  }
+
+  #det {
+    font-size:13px;
+    color:#6b7f96;
+    margin:0 0 6px;
+    letter-spacing:0.02em;
+  }
+  #det b {
+    color:#a0c4ff;
+    font-weight:600;
+  }
+
+  #cache {
+    font-size:12px;
+    color:#4a5568;
+    margin:0 0 12px;
+    min-height:16px;
+    transition:color 0.3s ease;
+  }
+  #cache.cacheok { color:#4fd1b0; }
+
+  .ok  { color:#4fd1b0; }
+  .bad { color:#f06868; }
+  .warn { color:#f0b040; }
+
+  /* Pulse dot animation for detecting state */
+  #state::before {
+    content:'';
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:50%;
+    background:#0ea5c0;
+    margin-right:10px;
+    vertical-align:middle;
+    animation:pulse 1.5s ease-in-out infinite;
+  }
+  .ok#state::before { background:#4fd1b0; animation:none; }
+  .bad#state::before { background:#f06868; animation:none; }
+  .warn#state::before { background:#f0b040; }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.4; transform:scale(0.7); }
+  }
+
+  /* Footer hint */
+  .footer-hint {
+    position:fixed;
+    bottom:20px;
+    left:0;right:0;
+    text-align:center;
+    font-size:11px;
+    color:#2d3a4a;
+    letter-spacing:0.06em;
+    z-index:10;
+  }
+</style>
+</head>
+<body>
+<div id="brand">
+  <div class="logo-icon">H</div>
+  <b>HEXA</b>
+</div>
+<div id="wrap">
+  <div id="state">detecting firmware...</div>
+  <div id="det"></div>
+  <div id="cache"></div>
+</div>
+<div class="footer-hint">HEXA &middot; PS4 HOST</div>
+
+<script>
+(function () {
+    var stateEl = document.getElementById("state");
+    var detEl = document.getElementById("det");
+    var cacheEl = document.getElementById("cache");
+    function setState(t, c) { stateEl.textContent = t; stateEl.className = c || ""; }
+    function setCache(t, ok) { cacheEl.textContent = t; cacheEl.className = ok ? "cacheok" : ""; }
+    var params = new URLSearchParams(location.search);
+
+    // Firmwares this build has a MEASURED kernel table for. jb.js still runs its
+    // own kernel-table-present gate, so this is UX only -- an unlisted firmware
+    // can still be launched with a tap. KEEP IN SYNC with ps4_offsets.js: add a
+    // fwnum here in the SAME commit that fills that firmware's kernel RVAs.
+    // The PS4 reports its minor as two hex digits in the UA (13.52 -> minor 0x52).
+    var SUPPORTED = { 1302: 1, 1304: 1, 1350: 1, 1352: 1 }; // all measured on hardware
+
+    var key = null, fwnum = null;
+    var m = /PlayStation\s+4[\/ ](\d+)\.(\d+)/.exec(navigator.userAgent);
+    if (m) {
+        var ms = parseInt(m[2], 16).toString(16);
+        if (ms.length < 2) ms = "0" + ms;
+        key = m[1] + "." + ms;
+        fwnum = parseInt(m[1], 10) * 100 + parseInt(ms, 10);
+    }
+
+    var forced = params.get("force") === "1";
+    var supported = forced || (fwnum !== null && SUPPORTED[fwnum] === 1);
+    detEl.innerHTML = "firmware <b>" + (key || "unknown") + "</b>"
+        + (supported ? " &middot; <b>supported</b>"
+                     : " &middot; not in this build's kernel table");
+
+    var target = "jb.html" + location.search;
+    function go() { setState("loading jailbreak...", "warn"); location.replace(target); }
+
+    function waitForTap(msg, action) {
+        setState(msg, "warn");
+        function fire() {
+            window.removeEventListener("click", fire);
+            window.removeEventListener("keydown", fire);
+            action();
+        }
+        window.addEventListener("click", fire);
+        window.addEventListener("keydown", fire);
+    }
+
+    // Off-target consoles are not launched automatically -- one tap still runs
+    // it, so a user-agent quirk on the real 13.52 console can never lock it out.
+    if (!supported) {
+        setState("UNSUPPORTED FIRMWARE", "bad");
+        waitForTap("UNSUPPORTED (" + (key || "unknown") + ") -- press X or tap to run anyway", go);
+        return;
+    }
+
+    var ac = window.applicationCache;
+    if (!ac || !document.documentElement.hasAttribute("manifest")) {
+        go();
+    } else if (!navigator.onLine) {
+        setCache("offline -- from cache", true);
+        go();
+    } else if (ac.status === ac.IDLE) {
+        setCache("cached", true);
+        go();
+    } else if (ac.status === ac.UPDATEREADY) {
+        try { ac.swapCache(); } catch (e) {}
+        setCache("update downloaded", true);
+        waitForTap("UPDATE READY -- press X or tap to reload & run",
+                   function () { location.reload(); });
+    } else {
+        setCache("checking cache...");
+        ac.addEventListener("downloading",
+            function () { setCache("caching for offline (first run)..."); }, false);
+        ac.addEventListener("progress", function (e) {
+            if (e && e.total)
+                setCache("caching " + Math.round((e.loaded / e.total) * 100) + "%");
+        }, false);
+        ac.addEventListener("cached", function () {
+            setCache("cached for offline use", true);
+            waitForTap("CACHED (first run) -- press X or tap to run", go);
+        }, false);
+        ac.addEventListener("updateready", function () {
+            try { ac.swapCache(); } catch (e) {}
+            setCache("update downloaded", true);
+            waitForTap("UPDATE READY -- press X or tap to reload & run",
+                       function () { location.reload(); });
+        }, false);
+        ac.addEventListener("noupdate", function () {
+            setCache("cached -- offline ready", true);
+            go();
+        }, false);
+        ac.addEventListener("error", function () {
+            setCache("cache unavailable");
+            waitForTap("CACHE FAILED -- press X or tap to run anyway", go);
+        }, false);
+        ac.addEventListener("obsolete", function () {
+            setCache("cache obsolete");
+            waitForTap("CACHE OBSOLETE -- press X or tap to run", go);
+        }, false);
+    }
+})();
+</script>
+</body>
+</html>
