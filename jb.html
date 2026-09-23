@@ -114,6 +114,53 @@
       body.fail #spin { display:none; }
       body.fail #msg  { display:block; }
 
+      /* Stage progress display */
+      #stage-wrap {
+        position:fixed;
+        top:calc(50% + 56px);
+        left:50%;
+        transform:translateX(-50%);
+        text-align:center;
+        z-index:10;
+        width:260px;
+      }
+      #stage-text {
+        font-size:13px;
+        font-weight:600;
+        color:#5de0f5;
+        letter-spacing:0.03em;
+        margin:0 0 10px;
+        min-height:18px;
+        animation:stagePulse 2s ease-in-out infinite;
+      }
+      @keyframes stagePulse {
+        0%,100% { opacity:1; }
+        50% { opacity:0.5; }
+      }
+      #stage-bar {
+        width:100%;
+        height:3px;
+        background:rgba(14,165,192,0.12);
+        border-radius:2px;
+        overflow:hidden;
+        margin:0 0 8px;
+      }
+      #stage-fill {
+        height:100%;
+        width:0%;
+        background:linear-gradient(90deg, #0ea5c0, #5de0f5);
+        border-radius:2px;
+        transition:width 0.5s ease;
+      }
+      #stage-num {
+        font-size:11px;
+        color:#3a4f66;
+        letter-spacing:0.05em;
+      }
+      body.done #stage-wrap,
+      body.fail #stage-wrap,
+      body.log #stage-wrap { display:none; }
+
       /* ?log=1 — full step log */
       body.log #spin,
       body.log #msg { display:none; }
@@ -178,6 +225,11 @@
       <b>HEXA</b>
     </div>
     <div id="spin"></div>
+    <div id="stage-wrap">
+      <div id="stage-text"></div>
+      <div id="stage-bar"><div id="stage-fill"></div></div>
+      <div id="stage-num"></div>
+    </div>
     <div id="msg">Restart your console</div>
     <div id="wrap">
       <div id="state"></div>

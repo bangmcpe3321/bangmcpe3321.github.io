@@ -5,6 +5,15 @@ import { offsetsFor } from "./ps4_offsets.js";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
+const stageTextEl = document.getElementById("stage-text");
+const stageFillEl = document.getElementById("stage-fill");
+const stageNumEl = document.getElementById("stage-num");
+const TOTAL_STAGES = 10;
+function setStage(n, text) {
+  if (stageTextEl) stageTextEl.textContent = text;
+  if (stageFillEl) stageFillEl.style.width = (n / TOTAL_STAGES * 100) + "%";
+  if (stageNumEl) stageNumEl.textContent = "Stage " + n + " / " + TOTAL_STAGES;
+}
 const lines = [];
 let passCount = 0,
   failCount = 0;
@@ -292,6 +301,7 @@ let allDone = false,
         "read-phase retry " + retryCount() + "/" + RETRY_MAX,
       );
 
+    setStage(1, "Initializing exploit primitive...");
     state("running the primitive...", "warn");
     await new Promise((r) => setTimeout(r, 0));
 
@@ -316,6 +326,7 @@ let allDone = false,
         "   (promotion off: the 137 MB stays pinned)",
     );
     mark("PRIMITIVE-OK", "");
+    setStage(2, "Building ROP chain...");
 
     const cell = p.leakval(Math.expm1);
     const nativeFn = p.read8(
@@ -661,6 +672,7 @@ let allDone = false,
       };
       return w;
     }
+    setStage(3, "Preparing worker threads...");
     const w1 = await bringWorker("w1");
     const w2 = await bringWorker("w2");
     await w1.fire(SYS.getpid, []);
@@ -781,6 +793,7 @@ let allDone = false,
     const bidAb = new ArrayBuffer(NBLOCK * 4);
     keepAlive.push(bidAb);
 
+    setStage(4, "Pinning CPU cores...");
     const CPU_LEVEL_WHICH = 3,
       CPU_WHICH_TID = 1,
       CPUSET_SZ = 0x10;
@@ -1045,6 +1058,7 @@ let allDone = false,
       return "ok sprayed=" + n + " wait=" + waitMs + "ms";
     }
 
+    setStage(5, "Leaking kernel pointers...");
     const lkNodes = new ArrayBuffer(NODE_SZ * N_LEAK);
     keepAlive.push(lkNodes);
     const lkNdv = new DataView(lkNodes),
@@ -1545,6 +1559,7 @@ let allDone = false,
     // so the next manual run starts fresh.
     clearRetry();
 
+    setStage(6, "Discovering kernel base...");
     const IDT = new int64(0x00001a00, 0xffffff80);
     const GATE_SZ = 16;
 
@@ -1849,6 +1864,7 @@ let allDone = false,
       return;
     }
 
+    setStage(7, "Building kernel R/W...");
     const OID = KBASE.add32(off.k_oid_kern_file);
     const O_NUM = OID.add32(0x10);
     const O_VIS = OID.add32(0x50);
@@ -2604,6 +2620,7 @@ let allDone = false,
               );
             }
 
+            setStage(8, "Jailbreaking...");
             if (DO_JB) {
               const P_UCRED = 0x40,
                 P_FD = 0x48,
@@ -2854,6 +2871,7 @@ let allDone = false,
               }
             }
 
+            setStage(9, "Patching kernel...");
             if (jbDone && DO_PATCH) {
               const jitStub = findStub(0x215),
                 kexecStub = findStub(0x295);
@@ -3029,6 +3047,7 @@ let allDone = false,
               }
             }
 
+            setStage(10, "Launching payload...");
             if (
               kpDone &&
               DO_PAYLOAD &&
